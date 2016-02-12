@@ -27,11 +27,11 @@
     (pop-to-buffer "*RGM help*"  help-window)
     (insert "h - Display this help\n")
     (insert "a - Add credentials for new site\n")
-    (insert "d - Delete credentials for selected site\n")    
+    (insert "d - Delete credentials for selected site\n")
     (insert "p - Copy site's password to clipboard\n")
     (insert "M-p - Message (minibuffer and *Messages*) site's password\n")
     (insert "l - Copy site's username (login) to clipboard\n")
-    (insert "c - Change master password\n")    
+    (insert "c - Change master password\n")
     (insert "e - Edit credentials for selected site\n")
     (setq buffer-read-only t)
     (select-window current-window)))
@@ -56,7 +56,7 @@
   (use-local-map rgm-mode-map)
   (add-hook 'kill-buffer-hook 'rgm-cleanup t t)
   (rgm-init-data)
-  (rgm-read-and-render-credentials)
+  (rgm-read-and-render-credentials rgm-file)
   (rgm-init-refresh-timer)
   (message "Press h for help"))
 
@@ -76,31 +76,31 @@
   (setq rgm-file (get-rgm-file)))
 
 
-(defun rgm-read-and-render-credentials ()
-  (setq credentials (rgm-read-credentials-interactive rgm-file))
+(defun rgm-read-and-render-credentials (rgm-file-param)
+  (setq credentials (rgm-read-credentials-interactive rgm-file-param))
   (setq tabulated-list-entries  (rgm-credentials-tabulated-list-entries credentials))
   (tabulated-list-print t))
 
-(defun rgm-refresh-timed-task ()
-    (undo-boundary)
-    (message "Refreshing credential data from file")
-    (rgm-read-and-render-credentials)
-    (undo-boundary))
+(defun rgm-refresh-timed-task (rgm-file password)
+  (undo-boundary)
+  (message "Refreshing credential data from file")
+  (rgm-read-and-render-credentials rgm-file)
+  (undo-boundary))
 
 (defun rgm-init-refresh-timer ()
-  (setq refresh-timer (run-at-time "30 min" 1800 'rgm-refresh-timed-task)))
+  (setq refresh-timer (run-at-time "10 min" 600 'rgm-refresh-timed-task rgm-file password)))
 
 (defun rgm-credentials-tabulated-list-entries (credentials)
   (let (result-list)
     (dolist (cred-elem credentials result-list)
-      (setq result-list 
-	    (cons (list 
-		   (rgm-elem-site cred-elem) 
-		   (vector 
-		    (rgm-elem-site cred-elem)
-		    (rgm-elem-user cred-elem)
-		    (rgm-elem-description cred-elem))) 
-		  result-list)))))
+      (setq result-list
+            (cons (list
+                   (rgm-elem-site cred-elem)
+                   (vector
+                    (rgm-elem-site cred-elem)
+                    (rgm-elem-user cred-elem)
+                    (rgm-elem-description cred-elem)))
+                  result-list)))))
 
 (defun rgm-elem-site (cred-elem)
   (car cred-elem))
@@ -227,12 +227,12 @@
   (let ((success) (credentials))
     (while (not success)
       (condition-case e
-          (progn 
+          (progn
             (setq success t)
             (setq credentials (rgm-read-credentials rgm-file password)))
         (error
          (if (string-match "bad decrypt" (error-message-string e))
-             (progn 
+             (progn
                (setq success nil)
                (funcall pwd-input-func))
                (error (error-message-string e))))))
@@ -248,7 +248,7 @@
 
 (defun rgm-write-credentials (rgm-file credentials password)
   (rgm-encrypt (json-encode credentials) rgm-file password))
-   
+
 (defun rgm-encrypt (contents outputfile password)
   (let ((tempfile (rgm-write-to-tempfile contents)))
     (rgm-encrypt-file tempfile outputfile password)
@@ -263,11 +263,11 @@
     plaintext))
 
 (defun rgm-encrypt-file (inputfile outputfile passwd)
-  (rgm-call 
+  (rgm-call
    (lambda () (call-process "openssl" nil t nil "enc" "-aes-256-cbc" "-a" "-salt" "-in" inputfile "-out" outputfile "-pass" (concat "pass:" passwd))) "Could not encrypt file: "))
 
 (defun rgm-decrypt-file (inputfile outputfile passwd)
-    (rgm-call 
+    (rgm-call
      (lambda () (call-process "openssl" nil t nil "enc" "-d" "-aes-256-cbc" "-a" "-in" inputfile "-out" outputfile "-pass" (concat "pass:" passwd))) "Could not decrypt file: "))
 
 (defun rgm-get-creds-name (line)

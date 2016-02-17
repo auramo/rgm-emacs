@@ -82,10 +82,11 @@
   (tabulated-list-print t))
 
 (defun rgm-refresh-timed-task (rgm-file password)
-  (undo-boundary)
-  (message "Refreshing credential data from file")
-  (rgm-read-and-render-credentials rgm-file)
-  (undo-boundary))
+  (with-current-buffer "*RGM*"
+    (undo-boundary)
+    (message "Refreshing credential data from file")
+    (rgm-read-and-render-credentials rgm-file)
+    (undo-boundary)))
 
 (defun rgm-init-refresh-timer ()
   (setq refresh-timer (run-at-time "10 min" 600 'rgm-refresh-timed-task rgm-file password)))
